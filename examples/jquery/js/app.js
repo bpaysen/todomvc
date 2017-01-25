@@ -47,51 +47,41 @@ jQuery(function ($) {
 			new Router({
 				'/:filter': function (filter) {
 					this.filter = filter;
-					this.render();
+					this.update();
 				}.bind(this)
 			}).init('/all');
 		},
+    
 		bindEvents: function () {
 			$('#new-todo').on('keyup', this.create.bind(this));
 			$('#toggle-all').on('change', this.toggleAll.bind(this));
 			$('#footer').on('click', '#clear-completed', this.destroyCompleted.bind(this));
 			$('#todo-list')
 				.on('change', '.toggle', this.toggle.bind(this))
-				.on('dblclick', 'label', this.edit.bind(this)) 
+				.on('dblclick', 'label', this.editHighlight.bind(this)) 
 				.on('keyup', '.edit', this.editKeyup.bind(this)) 
-				.on('focusout', '.edit', this.update.bind(this))
+				.on('focusout', '.edit', this.editAction.bind(this))
 				.on('click', '.destroy', this.destroy.bind(this));
 		},
-		render: function () {
-			var todos = this.getFilteredTodos();
-			$('#todo-list').html(this.todoTemplate(todos));
-			$('#main').toggle(todos.length > 0);
-			$('#toggle-all').prop('checked', this.getActiveTodos().length === 0);
-			this.renderFooter();
-			$('#new-todo').focus();
-			util.store('todos-jquery', this.todos);
+    
+    		/* The following used to be called render, but has been simplified:
+    		will call the new display method (view.render)
+    		and will save the data to Local Storage */
+    
+		update: function () {
+			view.render(); // calls the render method to display updates
+			util.store('todos-jquery', this.todos); // STORES current todos in local storage
 		},
-		renderFooter: function () {
-			var todoCount = this.todos.length;
-			var activeTodoCount = this.getActiveTodos().length;
-			var template = this.footerTemplate({
-				activeTodoCount: activeTodoCount,
-				activeTodoWord: util.pluralize(activeTodoCount, 'item'),
-				completedTodos: todoCount - activeTodoCount,
-				filter: this.filter
-			});
-
-			$('#footer').toggle(todoCount > 0).html(template);
-		},
+		
 		toggleAll: function (e) {
 			var isChecked = $(e.target).prop('checked');
 
 			this.todos.forEach(function (todo) {
 				todo.completed = isChecked;
 			});
-
-			this.render();
+			this.update();
 		},
+    
 		getActiveTodos: function () {
 			return this.todos.filter(function (todo) {
 				return !todo.completed;
@@ -113,13 +103,13 @@ jQuery(function ($) {
 
 			return this.todos;
 		},
+    
 		destroyCompleted: function () {
 			this.todos = this.getActiveTodos();
 			this.filter = 'all';
-			this.render();
+			this.update();
 		},
-		// accepts an element from inside the `.item` div and
-		// returns the corresponding index in the `todos` array
+	
 		indexFromEl: function (el) {
 			var id = $(el).closest('li').data('id');
 			var todos = this.todos;
@@ -131,6 +121,7 @@ jQuery(function ($) {
 				}
 			}
 		},
+    
 		create: function (e) {
 			var $input = $(e.target);
 			var val = $input.val().trim();
@@ -144,17 +135,18 @@ jQuery(function ($) {
 				title: val,
 				completed: false
 			});
-
 			$input.val('');
 
-			this.render();
+			this.update();
 		},
+    
 		toggle: function (e) {
 			var i = this.indexFromEl(e.target);
 			this.todos[i].completed = !this.todos[i].completed;
-			this.render();
+			this.update();
 		},
-		edit: function (e) {
+    
+		editHighlight: function (e) {
 			var $input = $(e.target).closest('li').addClass('editing').find('.edit');
 			$input.val($input.val()).focus();
 		},
@@ -167,23 +159,27 @@ jQuery(function ($) {
 				$(e.target).data('abort', true).blur();
 			}
 		},
-		update: function (e) {
+    
+    		/* The following used to be called update, but is more clearly labeled to indicate 
+  		that it takes actions: (destroy, falsify, or set value) */
+    
+		editAction: function (e) {
 			var el = e.target;
 			var $el = $(el);
 			var val = $el.val().trim();
 
 			if (!val) {		
-				this.destroy(e);
+				this.destroy(e); // destroy if no value in field and make .data 'abort' false
 				return;
 			}
 
 			if ($el.data('abort')) { 
-				$el.data('abort', false);
+				$el.data('abort', false); // if .data 'abort' true, make false
 			} else {
-				this.todos[this.indexFromEl(el)].title = val;
+				this.todos[this.indexFromEl(el)].title = val; // set the todo.title to $el.val 
 			}
 
-			this.render();
+			this.update();
 		},
     
         	/* Fixed bug that destroyed Todo with empty field when keyup ESCAPE:
@@ -197,13 +193,37 @@ jQuery(function ($) {
 			var $el = $(el);
 			
       			if ($el.data('abort')) {
-        			this.render();
+        			this.update();
       			} else {
         			this.todos.splice(this.indexFromEl(e.target), 1);
-        			this.render();
+        			this.update();
       			}
 		}
 	};
 
+	var view = {
+    
+    		render: function () {
+			var todos = App.getFilteredTodos();
+			$('#todo-list').html(App.todoTemplate(todos)); 
+			$('#main').toggle(todos.length > 0);
+			$('#toggle-all').prop('checked', App.getActiveTodos().length === 0);
+			this.renderFooter();
+			$('#new-todo').focus();
+    		},
+		
+    		renderFooter: function () {
+			var todoCount = App.todos.length;
+			var activeTodoCount = App.getActiveTodos().length;
+			var template = App.footerTemplate({
+				activeTodoCount: activeTodoCount,
+				activeTodoWord: util.pluralize(activeTodoCount, 'item'),
+				completedTodos: todoCount - activeTodoCount,
+				filter: App.filter
+			});
+			$('#footer').toggle(todoCount > 0).html(template);
+		},
+  	};
+	
 	App.init();
 });
